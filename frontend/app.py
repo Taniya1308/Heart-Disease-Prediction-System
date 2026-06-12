@@ -7,14 +7,82 @@ load_dotenv()
 
 API_URL = os.getenv("API_URL")
 
+# =========================
+# PAGE CONFIG
+# =========================
 st.set_page_config(
     page_title="HeartCare.ML",
     page_icon="🩺",
     layout="centered"
 )
 
-st.title("🩺 HeartCare.ML")
-st.write("Heart Disease Risk Predictor")
+# =========================
+# CUSTOM UI STYLE
+# =========================
+st.markdown("""
+    <style>
+
+    .stApp {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+
+    h1 {
+        color: #4da3ff;
+        text-align: center;
+        font-weight: 700;
+        margin-bottom: 0px;
+    }
+
+    p {
+        text-align: center;
+        color: #a0a0a0;
+    }
+
+    .stButton > button {
+        width: 100%;
+        background: linear-gradient(90deg, #4da3ff, #1f6feb);
+        color: white;
+        border-radius: 10px;
+        font-size: 16px;
+        padding: 10px;
+        border: none;
+        margin-top: 10px;
+    }
+
+    .stButton > button:hover {
+        background: linear-gradient(90deg, #1f6feb, #4da3ff);
+        transform: scale(1.02);
+        transition: 0.2s;
+    }
+
+    div[data-testid="stMetric"] {
+        background-color: #161b22;
+        border: 1px solid #2a2f3a;
+        padding: 15px;
+        border-radius: 12px;
+    }
+
+    .block-container {
+        padding-top: 2rem;
+        max-width: 1100px;
+    }
+
+    </style>
+""", unsafe_allow_html=True)
+
+# =========================
+# HEADER
+# =========================
+st.markdown("<h1>🩺 HeartGuard System</h1>", unsafe_allow_html=True)
+st.markdown("<p>Data-driven Heart Disease Risk Prediction System</p>", unsafe_allow_html=True)
+
+st.divider()
+
+# =========================
+# INPUT SECTION
+# =========================
+st.subheader("📋 Patient Information")
 
 col1, col2, col3 = st.columns(3)
 
@@ -37,7 +105,12 @@ with col3:
     ca = st.number_input("Major Vessels", 0, 4, 0)
     thal = st.number_input("Thal", 0, 3, 2)
 
-if st.button("🔍 Predict"):
+st.divider()
+
+# =========================
+# PREDICTION
+# =========================
+if st.button("🔍 Predict Risk"):
 
     input_data = {
         "age": int(age),
@@ -55,38 +128,41 @@ if st.button("🔍 Predict"):
         "thal": int(thal)
     }
 
-    try:
-        response = requests.post(
-            API_URL,
-            json=input_data,
-            timeout=10
-        )
+    with st.spinner("Analyzing patient data..."):
+        try:
+            response = requests.post(
+                API_URL,
+                json=input_data,
+                timeout=10
+            )
 
-        response.raise_for_status()
+            response.raise_for_status()
+            result = response.json()
 
-        result = response.json()
+            prediction = result["prediction"]
+            probability = result["probability"]
+            diagnosis = result["diagnosis"]
 
-        prediction = result["prediction"]
-        probability = result["probability"]
-        diagnosis = result["diagnosis"]
+            st.divider()
 
-        st.divider()
+            st.metric(
+                label="🫀 Heart Disease Probability",
+                value=f"{probability:.2f}"
+            )
 
-        st.metric(
-            "Heart Disease Probability",
-            f"{probability:.2f}"
-        )
+            if prediction == 1:
+                st.error(f"⚠️ {diagnosis}")
+            else:
+                st.success(f"✅ {diagnosis}")
 
-        if prediction == 1:
-            st.error(f"❗ {diagnosis}")
-        else:
-            st.success(f"✅ {diagnosis}")
+        except requests.exceptions.ConnectionError:
+            st.error("❌ Cannot connect to backend API. Make sure FastAPI is running.")
 
-    except requests.exceptions.ConnectionError:
-        st.error("Backend server is not running.")
+        except requests.exceptions.Timeout:
+            st.error("❌ Request timed out. Try again.")
 
-    except requests.exceptions.Timeout:
-        st.error("Request timed out.")
+        except requests.exceptions.HTTPError as e:
+            st.error(f"❌ HTTP Error: {e}")
 
-    except Exception as e:
-        st.error(str(e))
+        except Exception as e:
+            st.error(f"❌ Unexpected Error: {e}")
