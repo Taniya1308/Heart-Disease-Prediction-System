@@ -6,125 +6,393 @@ import pandas as pd
 from dotenv import load_dotenv
 from joblib import dump
 
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import(
+from sklearn.metrics import (
     accuracy_score,
     classification_report,
+    confusion_matrix,
+    precision_score,
     recall_score,
     f1_score,
+    roc_auc_score,
 )
 
 
+# =========================================================
+# FEATURE COLUMNS
+# =========================================================
+
+FEATURE_COLUMNS = [
+    "age",
+    "sex",
+    "cp",
+    "trestbps",
+    "chol",
+    "fbs",
+    "restecg",
+    "thalach",
+    "exang",
+    "oldpeak",
+    "slope",
+    "ca",
+    "thal",
+]
+
+TARGET_COLUMN = "target"
+
+
 def train_model():
+
+    # =====================================================
+    # LOAD ENVIRONMENT VARIABLES
+    # =====================================================
+
+    load_dotenv()
+
+    PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT")).resolve()
+
+    DATASET_PATH = (
+        PROJECT_ROOT
+        / os.getenv("DATASET_DIR")
+        / os.getenv("DATASET_NAME")
+    )
+
+    MODEL_PATH = (
+        PROJECT_ROOT
+        / os.getenv("MODEL_DIR")
+        / os.getenv("MODEL_NAME")
+    )
+
+    LOG_PATH = (
+        PROJECT_ROOT
+        / os.getenv("LOG_DIR")
+        / os.getenv("LOG_NAME")
+    )
+
+    TEST_SIZE = float(os.getenv("TEST_SIZE", 0.2))
+    RANDOM_STATE = int(os.getenv("RANDOM_STATE", 42))
+
+
+    # =====================================================
+    # CREATE DIRECTORIES
+    # =====================================================
+
+    MODEL_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+    LOG_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True
+    )
+
+
+    # =====================================================
+    # LOGGING
+    # =====================================================
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(LOG_PATH)
+        ],
+        force=True
+    )
+
+
     try:
-        #load env file content to env vars
-        load_dotenv()
 
-        PROJECT_ROOT = Path(os.getenv("PROJECT_ROOT")).resolve()
+        # =================================================
+        # LOAD DATASET
+        # =================================================
 
-        DATASET_PATH=PROJECT_ROOT / os.getenv("DATASET_DIR")/os.getenv("DATASET_NAME")
-        MODEL_PATH=PROJECT_ROOT / os.getenv("MODEL_DIR")/os.getenv("MODEL_NAME")
-        LOG_PATH=PROJECT_ROOT / os.getenv("LOG_DIR")/os.getenv("LOG_NAME")       
+        if not DATASET_PATH.exists():
+            raise FileNotFoundError(
+                f"Dataset not found: {DATASET_PATH}"
+            )
 
-        TARGET_COL=os.getenv("TARGET_COL")
-        TEST_SIZE=float(os.getenv("TEST_SIZE"))
-        RANDOM_STATE = int(os.getenv("RANDOM_STATE"))
+        df = pd.read_csv(DATASET_PATH)
 
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s| %(levelname)s | %(message)s",
-            handlers=[
-                logging.StreamHandler(),
-                logging.FileHandler(LOG_PATH)
-            ],
-            force=True
+        logging.info(
+            f"Dataset loaded successfully: {df.shape}"
         )
 
-        #load dataset
-        if not DATASET_PATH.exists():
-            raise FileNotFoundError(f"Dataset not found: {DATASET_PATH}")
-        df = pd.read_csv(DATASET_PATH)
-        logging.info(f"Dataset loaded with shape: {df.shape}")
 
-        #separate X and y
-        X=df.drop(columns=[TARGET_COL])
-        y=df[TARGET_COL]
+        # =================================================
+        # CHECK REQUIRED COLUMNS
+        # =================================================
 
-        #Create a signature for each feature row to prevent duplicate leakage to test set
-        row_signature=pd.util.hash_pandas_object(X, index=False)
+        required_columns = FEATURE_COLUMNS + [
+            TARGET_COLUMN
+        ]
 
-        #group-based split (same logic as notebook)
-        gss = GroupShuffleSplit(
-            n_splits=1,
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in df.columns
+        ]
+
+        if missing_columns:
+            raise ValueError(
+                f"Missing columns: {missing_columns}"
+            )
+
+
+        # =================================================
+        # SELECT FEATURES IN EXACT ORDER
+        # =================================================
+
+        X = df[FEATURE_COLUMNS].copy()
+
+        y = df[TARGET_COLUMN].copy()
+
+
+        # =================================================
+        # DISPLAY TARGET DISTRIBUTION
+        # =================================================
+
+        print("\nTarget Distribution:")
+        print(y.value_counts().sort_index())
+
+
+        # =================================================
+        # TRAIN TEST SPLIT
+        # =================================================
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X,
+            y,
             test_size=TEST_SIZE,
             random_state=RANDOM_STATE,
+            stratify=y
         )
-        train_idx, test_idx = next(gss.split(X, y, groups=row_signature))
 
-        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
 
-        logging.info(f"Train shape: {X_train.shape}, Test shape: {X_test.shape}")
+        logging.info(
+            f"Training samples: {len(X_train)}"
+        )
 
-        #Best params from notebook tuning
-        best_rf=RandomForestClassifier(
+        logging.info(
+            f"Testing samples: {len(X_test)}"
+        )
+
+
+        # =================================================
+        # RANDOM FOREST MODEL
+        # =================================================
+
+        random_forest = RandomForestClassifier(
+            n_estimators=500,
+            max_depth=8,
+            min_samples_split=5,
+            min_samples_leaf=2,
+            max_features="sqrt",
             random_state=RANDOM_STATE,
             n_jobs=-1,
-            bootstrap=True,
-            ccp_alpha=0.0017,
-            max_depth=5,
-            max_features="sqrt",
-            max_samples=0.6,
-            min_samples_leaf=11,
-            min_samples_split=30,
-            n_estimators=1119
+            class_weight=None
         )
 
-        #keep scaler in pipeline to match notebook structure
-        pipeline=Pipeline(
+
+        # =================================================
+        # PIPELINE
+        # =================================================
+
+        pipeline = Pipeline(
             steps=[
-                ("scaler", StandardScaler()),
-                ("model", best_rf)
+                (
+                    "scaler",
+                    StandardScaler()
+                ),
+                (
+                    "model",
+                    random_forest
+                )
             ]
         )
 
-        pipeline.fit(X_train, y_train)
-        logging.info("Model training completed")
 
-        #evaluate
-        y_train_pred=pipeline.predict(X_train)
-        y_test_pred=pipeline.predict(X_test)
+        # =================================================
+        # TRAIN
+        # =================================================
 
-        train_acc=accuracy_score(y_train, y_train_pred)
-        test_acc=accuracy_score(y_test, y_test_pred)
+        pipeline.fit(
+            X_train,
+            y_train
+        )
 
-        train_recall=recall_score(y_train, y_train_pred)
-        test_recall=recall_score(y_test, y_test_pred)
+        logging.info(
+            "Model training completed."
+        )
 
-        train_f1=f1_score(y_train, y_train_pred)
-        test_f1=f1_score(y_test, y_test_pred)
 
-        logging.info(f"Train Accuracy: {train_acc:.4f} | Recall: {train_recall:.4f} | F1: {train_f1:.4f}")
-        logging.info(f"Test Accuracy: {test_acc:.4f} | Recall: {test_recall:.4f} | F1: {test_f1:.4f}")
+        # =================================================
+        # PREDICTIONS
+        # =================================================
 
-        logging.info(f"Train classification report:\n" + classification_report(y_train, y_train_pred))
-        logging.info(f"Test classification report:\n" + classification_report(y_test, y_test_pred))
+        y_train_pred = pipeline.predict(
+            X_train
+        )
 
-        #save trained model
-        dump(pipeline, MODEL_PATH)
-        logging.info(f"Model saved to: {MODEL_PATH}")
+        y_test_pred = pipeline.predict(
+            X_test
+        )
 
-        logging.info("Training Script completed")
+
+        # =================================================
+        # PROBABILITY
+        # =================================================
+
+        y_test_probability = pipeline.predict_proba(
+            X_test
+        )[:, 1]
+
+
+        # =================================================
+        # METRICS
+        # =================================================
+
+        train_accuracy = accuracy_score(
+            y_train,
+            y_train_pred
+        )
+
+        test_accuracy = accuracy_score(
+            y_test,
+            y_test_pred
+        )
+
+        precision = precision_score(
+            y_test,
+            y_test_pred
+        )
+
+        recall = recall_score(
+            y_test,
+            y_test_pred
+        )
+
+        f1 = f1_score(
+            y_test,
+            y_test_pred
+        )
+
+        roc_auc = roc_auc_score(
+            y_test,
+            y_test_probability
+        )
+
+
+        # =================================================
+        # PRINT RESULTS
+        # =================================================
+
+        print("\n================================")
+        print("MODEL PERFORMANCE")
+        print("================================")
+
+        print(
+            f"Train Accuracy : {train_accuracy:.4f}"
+        )
+
+        print(
+            f"Test Accuracy  : {test_accuracy:.4f}"
+        )
+
+        print(
+            f"Precision       : {precision:.4f}"
+        )
+
+        print(
+            f"Recall          : {recall:.4f}"
+        )
+
+        print(
+            f"F1 Score        : {f1:.4f}"
+        )
+
+        print(
+            f"ROC-AUC         : {roc_auc:.4f}"
+        )
+
+
+        # =================================================
+        # CONFUSION MATRIX
+        # =================================================
+
+        print("\n================================")
+        print("CONFUSION MATRIX")
+        print("================================")
+
+        print(
+            confusion_matrix(
+                y_test,
+                y_test_pred
+            )
+        )
+
+
+        # =================================================
+        # CLASSIFICATION REPORT
+        # =================================================
+
+        print("\n================================")
+        print("CLASSIFICATION REPORT")
+        print("================================")
+
+        print(
+            classification_report(
+                y_test,
+                y_test_pred
+            )
+        )
+
+
+        # =================================================
+        # SAVE MODEL
+        # =================================================
+
+        dump(
+            pipeline,
+            MODEL_PATH
+        )
+
+        logging.info(
+            f"Model saved at: {MODEL_PATH}"
+        )
+
+
+        # =================================================
+        # SAVE FEATURE ORDER
+        # =================================================
+
+        print("\nModel Feature Order:")
+
+        for index, feature in enumerate(
+            FEATURE_COLUMNS,
+            start=1
+        ):
+            print(
+                f"{index}. {feature}"
+            )
+
+
+        print(
+            "\nModel successfully trained and saved."
+        )
+
 
     except Exception as e:
-        print(f"Training failed: {e}")
-        logging.exception(f"Training Script Failed: {e}")
+
+        logging.exception(
+            f"Training failed: {e}"
+        )
+
         raise
 
 
