@@ -6,6 +6,10 @@ The project uses a **Random Forest Classifier**, **FastAPI** backend, and **Stre
 
 > ⚠️ This project is for educational and research purposes only. It is not a medical diagnostic tool and should not replace professional medical advice.
 
+## Live Demo
+
+🔗 [heart-disease-prediction-system-4fhpbve8f9m7c37pzh87av.streamlit.app](https://heart-disease-prediction-system-4fhpbve8f9m7c37pzh87av.streamlit.app/)
+
 ## Features
 
 - Heart disease prediction using Machine Learning
