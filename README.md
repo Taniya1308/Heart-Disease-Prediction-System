@@ -57,12 +57,17 @@ Target:
 ```text
 Heart-Disease-Prediction-System/
 │
+├── .streamlit/
+│   └── config.toml
+│
 ├── backend/
+│   ├── __init__.py
 │   ├── main.py
 │   ├── predictor.py
 │   └── training.py
 │
 ├── frontend/
+│   ├── __init__.py
 │   └── app.py
 │
 ├── dataset/
@@ -76,31 +81,75 @@ Heart-Disease-Prediction-System/
 │
 ├── .env
 ├── .gitignore
+├── env_template.txt
 ├── requirements.txt
 └── README.md
 ```
 
-## Run the Project
+## Deploy on Streamlit Community Cloud
 
-Train the model:
+The app is ready to deploy on [Streamlit Community Cloud](https://streamlit.io/cloud) for free.
+
+### Steps
+
+1. **Push the repository to GitHub**
+
+   Make sure the following files are committed and pushed:
+   - `frontend/app.py`
+   - `backend/predictor.py`
+   - `model_dir/heart_disease_prediction_model.joblib`
+   - `dataset/heart.csv`
+   - `requirements.txt`
+   - `.streamlit/config.toml`
+
+   > The `.env` file is gitignored and should not be pushed. It is only needed locally for retraining the model.
+
+2. **Go to [share.streamlit.io](https://share.streamlit.io)** and sign in with your GitHub account.
+
+3. **Click "New app"** and fill in the fields:
+
+   | Field | Value |
+   |---|---|
+   | Repository | `your-github-username/Heart-Disease-Prediction-System` |
+   | Branch | `main` |
+   | Main file path | `frontend/app.py` |
+
+4. **Click "Deploy"** — Streamlit Cloud will install dependencies from `requirements.txt` and launch the app automatically.
+
+The app will be live at a public URL like:
+```
+https://your-github-username-heart-disease-prediction-system-frontend-app-xxxx.streamlit.app
+```
+
+## Run Locally
+
+**Install dependencies:**
+
+```bash
+pip install -r requirements.txt
+```
+
+**Train the model** (only needed if you don't have the saved model):
+
+Copy `env_template.txt` to `.env` and fill in your project root path, then run:
 
 ```bash
 python -m backend.training
 ```
 
-Start the FastAPI backend:
-
-```bash
-python -m uvicorn backend.main:app --reload
-```
-
-Start the Streamlit frontend:
+**Start the Streamlit frontend:**
 
 ```bash
 streamlit run frontend/app.py
 ```
 
-Open the application in your browser and enter the patient information to get the prediction.
+**Start the FastAPI backend** (optional — only needed if using the REST API):
+
+```bash
+uvicorn backend.main:app --reload
+```
+
+Open `http://localhost:8501` for the Streamlit app, or `http://localhost:8000/docs` for the FastAPI interactive docs.
 
 ## Author
 

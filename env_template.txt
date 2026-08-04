@@ -10,6 +10,6 @@ MODEL_NAME=heart_disease_prediction_model.joblib
 
 TARGET_COL=target
 TEST_SIZE=0.15
-RANDOM_STATE=42s
+RANDOM_STATE=42
 
 API_URL=https://127.0.0.1:8000/predict-heart-disease
