@@ -1,20 +1,6 @@
-import os
-
-import requests
 import streamlit as st
-from dotenv import load_dotenv
 
-
-# =========================================================
-# LOAD ENVIRONMENT
-# =========================================================
-
-load_dotenv()
-
-API_URL = os.getenv(
-    "API_URL",
-    "http://127.0.0.1:8000/predict-heart-disease"
-)
+from backend.predictor import predict
 
 
 # =========================================================
@@ -86,7 +72,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-
 st.divider()
 
 
@@ -119,7 +104,6 @@ with col1:
         value=52
     )
 
-
     sex_label = st.selectbox(
         "Sex",
         [
@@ -128,13 +112,11 @@ with col1:
         ]
     )
 
-
     sex = (
         0
         if sex_label == "Female"
         else 1
     )
-
 
     cp = st.number_input(
         "Chest Pain Type",
@@ -143,14 +125,12 @@ with col1:
         value=0
     )
 
-
     trestbps = st.number_input(
         "Resting Blood Pressure (mm Hg)",
         min_value=0,
         max_value=300,
         value=125
     )
-
 
     chol = st.number_input(
         "Cholesterol (mg/dl)",
@@ -174,13 +154,11 @@ with col2:
         ]
     )
 
-
     fbs = (
         0
         if fbs_label == "No"
         else 1
     )
-
 
     restecg = st.number_input(
         "Resting ECG",
@@ -189,14 +167,12 @@ with col2:
         value=1
     )
 
-
     thalach = st.number_input(
         "Maximum Heart Rate",
         min_value=0,
         max_value=300,
         value=168
     )
-
 
     exang_label = st.selectbox(
         "Exercise Induced Angina",
@@ -205,7 +181,6 @@ with col2:
             "Yes"
         ]
     )
-
 
     exang = (
         0
@@ -228,7 +203,6 @@ with col3:
         step=0.1
     )
 
-
     slope = st.number_input(
         "Slope",
         min_value=0,
@@ -236,14 +210,12 @@ with col3:
         value=2
     )
 
-
     ca = st.number_input(
         "Major Vessels",
         min_value=0,
         max_value=4,
         value=0
     )
-
 
     thal = st.number_input(
         "Thal",
@@ -301,17 +273,13 @@ if st.button(
 
         try:
 
-            response = requests.post(
-                API_URL,
-                json=input_data,
-                timeout=10
+            # =========================================
+            # DIRECT MODEL PREDICTION
+            # =========================================
+
+            result = predict(
+                input_data
             )
-
-
-            response.raise_for_status()
-
-
-            result = response.json()
 
 
             prediction = result[
@@ -320,10 +288,6 @@ if st.button(
 
             probability = result[
                 "probability"
-            ]
-
-            diagnosis = result[
-                "diagnosis"
             ]
 
 
@@ -350,16 +314,20 @@ if st.button(
             )
 
 
+            # =========================================
+            # DIAGNOSIS
+            # =========================================
+
             if prediction == 1:
 
                 st.warning(
-                    f"⚠️ {diagnosis}"
+                    "⚠️ Heart Disease Detected"
                 )
 
             else:
 
                 st.success(
-                    f"✅ {diagnosis}"
+                    "✅ Lower Risk Pattern Detected"
                 )
 
 
@@ -376,32 +344,10 @@ if st.button(
                 )
 
 
-        except requests.exceptions.ConnectionError:
-
-            st.error(
-                "❌ Cannot connect to backend API. "
-                "Make sure FastAPI is running."
-            )
-
-
-        except requests.exceptions.Timeout:
-
-            st.error(
-                "❌ Request timed out."
-            )
-
-
-        except requests.exceptions.HTTPError as e:
-
-            st.error(
-                f"❌ API Error: {e}"
-            )
-
-
         except Exception as e:
 
             st.error(
-                f"❌ Unexpected Error: {e}"
+                f"❌ Prediction Error: {e}"
             )
 
 

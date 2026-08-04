@@ -1,9 +1,7 @@
-import os
 import logging
 from pathlib import Path
 
 import pandas as pd
-from dotenv import load_dotenv
 from joblib import load
 
 
@@ -29,34 +27,21 @@ FEATURE_COLUMNS = [
 
 
 # =========================================================
-# LOAD ENVIRONMENT
+# PROJECT PATHS
 # =========================================================
 
-load_dotenv()
+# predictor.py is inside:
+# project_root/backend/predictor.py
+#
+# parent        -> backend
+# parent.parent -> project root
 
-
-PROJECT_ROOT = Path(
-    os.getenv("PROJECT_ROOT")
-).resolve()
-
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 MODEL_PATH = (
     PROJECT_ROOT
-    / os.getenv("MODEL_DIR")
-    / os.getenv("MODEL_NAME")
-)
-
-
-LOG_PATH = (
-    PROJECT_ROOT
-    / os.getenv("LOG_DIR")
-    / os.getenv("LOG_NAME")
-)
-
-
-LOG_PATH.parent.mkdir(
-    parents=True,
-    exist_ok=True
+    / "model_dir"
+    / "heart_disease_prediction_model.joblib"
 )
 
 
@@ -67,11 +52,9 @@ LOG_PATH.parent.mkdir(
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(LOG_PATH)
-    ]
 )
+
+logger = logging.getLogger(__name__)
 
 
 # =========================================================
@@ -79,18 +62,14 @@ logging.basicConfig(
 # =========================================================
 
 if not MODEL_PATH.exists():
-
     raise FileNotFoundError(
-        f"Model file not found: {MODEL_PATH}"
+        f"Model file not found at: {MODEL_PATH}"
     )
 
 
-model = load(
-    MODEL_PATH
-)
+model = load(MODEL_PATH)
 
-
-logging.info(
+logger.info(
     f"Model loaded successfully from: {MODEL_PATH}"
 )
 
@@ -105,13 +84,11 @@ def predict(input_data: dict):
     # Create DataFrame
     # -----------------------------------------------
 
-    df = pd.DataFrame(
-        [input_data]
-    )
+    df = pd.DataFrame([input_data])
 
 
     # -----------------------------------------------
-    # Validate columns
+    # Validate required columns
     # -----------------------------------------------
 
     missing_columns = [
@@ -121,7 +98,6 @@ def predict(input_data: dict):
     ]
 
     if missing_columns:
-
         raise ValueError(
             f"Missing features: {missing_columns}"
         )
@@ -131,9 +107,7 @@ def predict(input_data: dict):
     # Force exact feature order
     # -----------------------------------------------
 
-    df = df[
-        FEATURE_COLUMNS
-    ]
+    df = df[FEATURE_COLUMNS]
 
 
     # -----------------------------------------------
@@ -149,17 +123,11 @@ def predict(input_data: dict):
     # Prediction probability
     # -----------------------------------------------
 
-    probabilities = model.predict_proba(
-        df
-    )[0]
-
-
-    # Find probability corresponding to class 1
+    probabilities = model.predict_proba(df)[0]
 
     class_1_index = list(
         model.classes_
     ).index(1)
-
 
     probability = float(
         probabilities[class_1_index]
@@ -170,7 +138,7 @@ def predict(input_data: dict):
     # Logging
     # -----------------------------------------------
 
-    logging.info(
+    logger.info(
         f"Prediction={prediction} | "
         f"Probability={probability:.4f}"
     )
@@ -181,9 +149,6 @@ def predict(input_data: dict):
     # -----------------------------------------------
 
     return {
-
         "prediction": prediction,
-
-        "probability": probability
-
+        "probability": probability,
     }
