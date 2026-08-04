@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+# Ensure the project root is on the path so `backend` resolves
+# whether the app is run locally or from Streamlit Cloud
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
 
 from backend.predictor import predict
